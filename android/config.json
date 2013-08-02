@@ -1,0 +1,12 @@
+{
+        "copyFiles": [
+            "WebSocketPlugin.java"
+        ],
+        "libraries": [
+            "AndroidAsync/AndroidAsync"
+        ],
+        "jars": [
+        ],
+        "injectionXML": "manifest.xml",
+        "injectionXSL": "manifest.xsl"
+}

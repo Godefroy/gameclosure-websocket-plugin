@@ -1,0 +1,6 @@
+[submodule "ios/AZSocketIO"]
+	path = ios/AZSocketIO
+	url = https://github.com/pashields/AZSocketIO.git
+[submodule "android/AndroidAsync"]
+	path = android/AndroidAsync
+	url = https://github.com/koush/AndroidAsync
