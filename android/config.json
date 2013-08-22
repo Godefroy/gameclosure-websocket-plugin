@@ -3,7 +3,7 @@
             "WebSocketPlugin.java"
         ],
         "libraries": [
-            "AndroidAsync/AndroidAsync"
+            "AutobahnAndroid/Autobahn"
         ],
         "jars": [
         ],

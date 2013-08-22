@@ -1,36 +1,55 @@
 package com.tealeaf.plugin.plugins;
-import com.koushikdutta.async.http.AsyncHttpClient;
-import com.koushikdutta.async.http.AsyncHttpClient.WebSocketConnectCallback;
-import com.koushikdutta.async.http.WebSocket;
-import com.koushikdutta.async.http.WebSocket.StringCallback;
-import com.koushikdutta.async.http.libcore.RequestHeaders;
-import com.koushikdutta.async.callback.CompletedCallback;
+import de.tavendo.autobahn.WebSocket;
+import de.tavendo.autobahn.WebSocketConnection;
+import de.tavendo.autobahn.WebSocketConnectionHandler;
+import de.tavendo.autobahn.WebSocketException;
+import de.tavendo.autobahn.WebSocketOptions;
 import com.tealeaf.logger;
 import com.tealeaf.EventQueue;
+import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
 public class WebSocketPlugin {
 
-    private Map<Integer, WebSocket> instances = new HashMap<Integer, WebSocket>();
+    private Map<Integer, WebSocketConnection> instances = new HashMap<Integer, WebSocketConnection>();
 
-    public class WebSocketEvent extends com.tealeaf.event.Event {
-        String type, data;
+    public class WebSocketEventOpen extends com.tealeaf.event.Event {
         Integer id;
-
-        public WebSocketEvent(Integer id, String type) {
-            super("websocket");
+        public WebSocketEventOpen(Integer id) {
+            super("websocket:open");
             this.id = id;
-            this.type = type;
         }
-
-        public WebSocketEvent(Integer id, String type, String data) {
-            super("websocket");
+    }
+    public class WebSocketEventClose extends com.tealeaf.event.Event {
+        Integer id;
+        Integer code;
+        String reason;
+        public WebSocketEventClose(Integer id, int code, String reason) {
+            super("websocket:close");
             this.id = id;
-            this.type = type;
+            this.code = code;
+            this.reason = reason;
+        }
+    }
+    public class WebSocketEventMessage extends com.tealeaf.event.Event {
+        Integer id;
+        String data;
+        public WebSocketEventMessage(Integer id, String data) {
+            super("websocket:message");
+            this.id = id;
             this.data = data;
+        }
+    }
+    public class WebSocketEventError extends com.tealeaf.event.Event {
+        Integer id;
+        public WebSocketEventError(Integer id) {
+            super("websocket:error");
+            this.id = id;
         }
     }
 
@@ -39,36 +58,58 @@ public class WebSocketPlugin {
             JSONObject obj = new JSONObject(json);
             final Integer id = obj.getInt("id");
             String url = obj.getString("url");
-            String protocol = obj.has("protocol") ? obj.getString("protocol") : null;
 
-            AsyncHttpClient.getDefaultInstance().websocket(url, protocol, new WebSocketConnectCallback() {
-                @Override
-                public void onCompleted(Exception ex, WebSocket websocket) {
-                    instances.put(id, websocket);
-
-                    // onOpen
-                    EventQueue.pushEvent(new WebSocketEvent(id, "open"));
-
-                    // onMessage
-                    websocket.setStringCallback(new StringCallback() {
-                        public void onStringAvailable(String data) {
-                            EventQueue.pushEvent(new WebSocketEvent(id, "message", data));
+            String[] protocols = null;
+            if (obj.has("protocols")) {
+                try {
+                    protocols = new String[1];
+                    protocols[0] = obj.getString("protocols");
+                } catch (JSONException ex) {
+                    try {
+                        JSONArray protocolsJSON = obj.getJSONArray("protocols");
+                        protocols = new String[protocolsJSON.length()];
+                        for(int i = 0; i < protocolsJSON.length(); i++) {
+                            protocols[i] = protocolsJSON.getString(i);
                         }
-                    });
-
-                    // onClose
-                    websocket.setClosedCallback(new CompletedCallback() {
-                        public void onCompleted(Exception ex) {
-                            logger.log("{websocket} websocketOnclose - " + ex.getMessage() + ", " + ex);
-                            EventQueue.pushEvent(new WebSocketEvent(id, "close"));
-                            instances.remove(id);
-                        }
-                    });
+                    } catch (JSONException exx) { }
                 }
-            });
+            }
 
-        } catch (JSONException e) {
-            logger.log("{websocket} Error WebSocketPlugin.connect - " + e.getMessage() + ", value: \"" + json + "\"");
+            try {
+
+                WebSocketOptions options = new WebSocketOptions();
+                List<BasicNameValuePair> headers = null;
+
+                final WebSocketConnection websocket = new WebSocketConnection();
+
+                websocket.connect(url, protocols, new WebSocketConnectionHandler() {
+                    @Override
+                    public void onOpen() {
+                        instances.put(id, websocket);
+                        EventQueue.pushEvent(new WebSocketEventOpen(id));
+                        logger.log("{websocket} onOpen");
+                    }
+
+                    @Override
+                    public void onTextMessage(String data) {
+                        EventQueue.pushEvent(new WebSocketEventMessage(id, data));
+                    }
+
+                    @Override
+                    public void onClose(int code, String reason) {
+                        logger.log("{websocket} onClose - Code: " + code + " - Reason: " + reason);
+                        EventQueue.pushEvent(new WebSocketEventClose(id, code, reason));
+                        instances.remove(id);
+                    }
+                }, options, headers);
+
+            } catch (WebSocketException wsException) {
+                logger.log("{websocket} Error WebSocketPlugin.connect - " + wsException.getMessage());
+                EventQueue.pushEvent(new WebSocketEventError(id));
+            }
+
+        } catch (JSONException jsonException) {
+            logger.log("{websocket} Error WebSocketPlugin.connect - " + jsonException.getMessage() + ", value: \"" + json + "\"");
         }
     }
 
@@ -80,7 +121,7 @@ public class WebSocketPlugin {
             if (!instances.containsKey(id)) {
                 throw new Exception("WebSocket n°" + id + " not found");
             }
-            instances.get(id).send(data);
+            instances.get(id).sendTextMessage(data);
 
         } catch (JSONException e) {
             logger.log("{websocket} Error WebSocketPlugin.send - " + e.getMessage() + ", value: \"" + json + "\"");
@@ -95,7 +136,7 @@ public class WebSocketPlugin {
             if (!instances.containsKey(id)) {
                 throw new Exception("WebSocket n°" + id + " not found");
             }
-            instances.get(id).close();
+            instances.get(id).disconnect();
 
         } catch (Exception e) {
             logger.log("{websocket} Error WebSocketPlugin.close - " + e.getMessage());

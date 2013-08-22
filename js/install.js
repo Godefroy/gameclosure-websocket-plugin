@@ -21,18 +21,18 @@ if (device.isMobileNative) {
     this.OPEN = 1;
     this.CLOSING = 2;
     this.CLOSED = 3;
+    this.protocol = "";
 
-    this.init = function(url, protocol) {
+    this.init = function(url, protocols) {
       this.id = nInstances++;
       this.url = this.URL = url;
-      this.protocol = protocol;
       instances[this.id] = this;
       var params = {
         id: this.id,
         url: url
       };
-      if (protocol) {
-        params.protocol = protocol;
+      if (protocols) {
+        params.protocols = protocols;
       }
       NATIVE.plugins.sendEvent("WebSocketPlugin", "connect", JSON.stringify(params));
       this.readyState = this.CONNECTING;
@@ -40,16 +40,18 @@ if (device.isMobileNative) {
 
     this.send = function(data) {
       if (this.readyState == this.CONNECTING) {
-        throw "INVALID_STATE_ERR: Web Socket connection has not been established";
+        var error = new Error("InvalidStateError: An attempt was made to use an object that is not, or is no longer, usable.");
+        error.name = "InvalidStateError";
+        throw error;
+      }
+      if (this.readyState == this.CLOSING || this.readyState == this.CLOSED) {
+        throw new Error("WebSocket is already in CLOSING or CLOSED state.");
       }
       if (this.readyState == this.OPEN) {
         NATIVE.plugins.sendEvent("WebSocketPlugin", "send", JSON.stringify({
           id: this.id,
           data: data
         }));
-        return true;
-      } else {
-        return false;
       }
     };
 
@@ -68,38 +70,54 @@ if (device.isMobileNative) {
 
 
   // Websocket events
-  NATIVE.events.registerHandler('websocket', function(evt) {
+
+  var propagateEvent = function(instance, eventType, params) {
+    var event = merge(params || {}, {
+      type: eventType,
+      bubbles: false,
+      cancelable: false
+    });
+    if (instance["on" + eventType]) {
+      instance["on" + eventType](event);
+    }
+    instance.emit(eventType, event);
+  };
+
+  NATIVE.events.registerHandler("websocket:open", function(evt) {
     var instance = instances[evt.id];
     if (instance) {
-      var newEvent = {
-        type: evt.type,
-        bubbles: false,
-        cancelable: false
-      };
-
-      switch (evt.type) {
-        case "open":
-          instance.readyState = instance.OPEN;
-          break;
-
-        case "close":
-          instance.readyState = instance.CLOSED;
-          newEvent.wasClean = evt.wasClean;
-          newEvent.code = evt.code;
-          newEvent.reason = evt.reason;
-          break;
-
-        case "message":
-          newEvent.data = evt.data;
-          break;
-      }
-
-      if (instance["on" + evt.type]) {
-        instance["on" + evt.type](newEvent);
-      }
-      instance.emit(evt.type, newEvent);
+      instance.readyState = instance.OPEN;
+      propagateEvent(instance, "open");
     }
+  });
 
+
+  NATIVE.events.registerHandler("websocket:close", function(evt) {
+    var instance = instances[evt.id];
+    if (instance) {
+      instance.readyState = instance.CLOSED;
+      propagateEvent(instance, "close", {
+        wasClean: evt.wasClean,
+        code: evt.code,
+        reason: evt.reason
+      });
+    }
+  });
+
+  NATIVE.events.registerHandler("websocket:message", function(evt) {
+    var instance = instances[evt.id];
+    if (instance) {
+      propagateEvent(instance, "message", {
+        data: evt.data
+      });
+    }
+  });
+
+  NATIVE.events.registerHandler("websocket:error", function(evt) {
+    var instance = instances[evt.id];
+    if (instance) {
+      propagateEvent(instance, "error");
+    }
   });
 
 
