@@ -47,9 +47,11 @@ public class WebSocketPlugin {
     }
     public class WebSocketEventError extends com.tealeaf.event.Event {
         Integer id;
-        public WebSocketEventError(Integer id) {
+        String message;
+        public WebSocketEventError(Integer id, String message) {
             super("websocket:error");
             this.id = id;
+            this.message = message;
         }
     }
 
@@ -105,7 +107,7 @@ public class WebSocketPlugin {
 
             } catch (WebSocketException wsException) {
                 logger.log("{websocket} Error WebSocketPlugin.connect - " + wsException.getMessage());
-                EventQueue.pushEvent(new WebSocketEventError(id));
+                EventQueue.pushEvent(new WebSocketEventError(id, wsException.getMessage()));
             }
 
         } catch (JSONException jsonException) {

@@ -116,7 +116,9 @@ if (device.isMobileNative) {
   NATIVE.events.registerHandler("websocket:error", function(evt) {
     var instance = instances[evt.id];
     if (instance) {
-      propagateEvent(instance, "error");
+      propagateEvent(instance, "error", {
+        message: evt.message
+      });
     }
   });
 
