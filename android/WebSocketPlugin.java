@@ -4,8 +4,16 @@ import de.tavendo.autobahn.WebSocketConnection;
 import de.tavendo.autobahn.WebSocketConnectionHandler;
 import de.tavendo.autobahn.WebSocketException;
 import de.tavendo.autobahn.WebSocketOptions;
+
+import android.os.Bundle;
+import android.app.Activity;
+import android.content.Intent;
+import android.content.Context;
+
 import com.tealeaf.logger;
 import com.tealeaf.EventQueue;
+import com.tealeaf.plugin.IPlugin;
+
 import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -14,7 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
-public class WebSocketPlugin {
+
+public class WebSocketPlugin implements IPlugin {
 
     private Map<Integer, WebSocketConnection> instances = new HashMap<Integer, WebSocketConnection>();
 
@@ -108,10 +117,15 @@ public class WebSocketPlugin {
             } catch (WebSocketException wsException) {
                 logger.log("{websocket} Error WebSocketPlugin.connect - " + wsException.getMessage());
                 EventQueue.pushEvent(new WebSocketEventError(id, wsException.getMessage()));
+            } catch (Exception e) {
+                logger.log("{websocket} Error WebSocketPlugin.connect - " + e.getMessage());
+                EventQueue.pushEvent(new WebSocketEventError(id, e.getMessage()));
             }
 
         } catch (JSONException jsonException) {
             logger.log("{websocket} Error WebSocketPlugin.connect - " + jsonException.getMessage() + ", value: \"" + json + "\"");
+        } catch (Exception e) {
+            logger.log("{websocket} Error WebSocketPlugin.connect - " + e.getMessage());
         }
     }
 
@@ -144,4 +158,35 @@ public class WebSocketPlugin {
             logger.log("{websocket} Error WebSocketPlugin.close - " + e.getMessage());
         }
     }
+
+    public void onCreate(Activity activity, Bundle savedInstanceState){
+    }
+
+    public void onCreateApplication(Context applicationContext){
+    }
+
+    public void onResume(){
+    }
+
+    public void onStart(){
+    }
+
+    public void onPause(){
+    }
+
+    public void onStop(){
+    }
+
+    public void onDestroy(){
+    }
+
+    public void onNewIntent(Intent intent){
+    }
+
+    public void onActivityResult(Integer request, Integer result, Intent data){
+    }
+
+    public void setInstallReferrer(String referrer){
+    }
+
 }

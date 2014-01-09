@@ -3,4 +3,4 @@
 	url = https://github.com/pashields/AZSocketIO.git
 [submodule "android/AutobahnAndroid"]
 	path = android/AutobahnAndroid
-	url = https://github.com/tavendo/AutobahnAndroid.git
+	url = https://github.com/Godefroy/AutobahnAndroid.git
